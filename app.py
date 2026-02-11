@@ -1,105 +1,77 @@
-from flask import Flask, request, jsonify
 import os
-
+import random
+from flask import Flask, request, jsonify
 from database import db
-from models import User, AuditLog
-from services import (
-    admin_create_user,
-    link_discord_account,
-    get_user_by_discord_id,
-    suspend_user,
-    activate_user
-)
-from auth import authenticate
+from models import Card
+from datetime import datetime
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///uoi.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
+def generate_id():
+    return str(random.randint(100000, 999999))
 
-@app.route("/login", methods=["POST"])
-def login():
+@app.before_first_request
+def create_tables():
+    db.create_all()
+
+@app.route("/register", methods=["POST"])
+def register():
     data = request.json
-    user = authenticate(data.get("username"), data.get("password"))
-    if not user:
-        return jsonify({"error": "Invalid credentials"}), 401
+
+    if len(data["password"]) != 6:
+        return jsonify({"error": "Password must be exactly 6 characters"}), 400
+
+    existing = Card.query.filter_by(discord_id=data["discord_id"]).first()
+    if existing:
+        return jsonify({"error": "Already registered"}), 400
+
+    new_card = Card(
+        user_id=generate_id(),
+        discord_id=data["discord_id"],
+        full_name=data["full_name"],
+        nationality=data["nationality"],
+        password=data["password"],
+        status="pending"
+    )
+
+    db.session.add(new_card)
+    db.session.commit()
+
+    return jsonify({"message": "Request submitted"})
+
+@app.route("/approve/<discord_id>", methods=["POST"])
+def approve(discord_id):
+    card = Card.query.filter_by(discord_id=discord_id).first()
+    if not card:
+        return jsonify({"error": "Not found"}), 404
+
+    card.status = "active"
+    card.issued_at = datetime.utcnow()
+    db.session.commit()
 
     return jsonify({
-        "user_id": user.user_id,
-        "role": user.role
+        "message": "Approved",
+        "user_id": card.user_id
     })
 
-
-@app.route("/link-discord", methods=["POST"])
-def link_discord():
-    data = request.json
-    user = User.query.filter_by(username=data.get("username")).first()
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
-    if not link_discord_account(user, data.get("discord_id")):
-        return jsonify({"error": "Discord already linked"}), 409
-
-    return jsonify({"message": "Linked"})
-
-
-@app.route("/myid", methods=["POST"])
-def myid():
-    user = get_user_by_discord_id(request.json.get("discord_id"))
-    if not user:
-        return jsonify({"error": "No ID"}), 404
+@app.route("/card/<discord_id>")
+def get_card(discord_id):
+    card = Card.query.filter_by(discord_id=discord_id).first()
+    if not card:
+        return jsonify({"error": "Not found"}), 404
 
     return jsonify({
-        "user_id": user.user_id,
-        "username": user.username,
-        "role": user.role,
-        "status": user.status
+        "full_name": card.full_name,
+        "nationality": card.nationality,
+        "user_id": card.user_id,
+        "status": card.status,
+        "issued_at": card.issued_at
     })
-
-
-@app.route("/admin/suspend", methods=["POST"])
-def admin_suspend():
-    data = request.json
-    admin = authenticate(data.get("admin_username"), data.get("admin_password"))
-    user = suspend_user(admin, data.get("user_id"))
-    if not user:
-        return jsonify({"error": "Unauthorized or not found"}), 403
-    return jsonify({"message": "Suspended"})
-
-
-@app.route("/admin/activate", methods=["POST"])
-def admin_activate():
-    data = request.json
-    admin = authenticate(data.get("admin_username"), data.get("admin_password"))
-    user = activate_user(admin, data.get("user_id"))
-    if not user:
-        return jsonify({"error": "Unauthorized or not found"}), 403
-    return jsonify({"message": "Activated"})
-
-
-@app.route("/admin/audit-logs", methods=["POST"])
-def audit_logs():
-    data = request.json
-    admin = authenticate(data.get("admin_username"), data.get("admin_password"))
-    if not admin or admin.role != "admin":
-        return jsonify({"error": "Unauthorized"}), 403
-
-    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(10).all()
-    return jsonify([
-        {
-            "actor": l.actor,
-            "action": l.action,
-            "target": l.target,
-            "time": l.timestamp.isoformat()
-        } for l in logs
-    ])
-
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
