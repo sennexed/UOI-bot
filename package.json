@@ -1,0 +1,14 @@
+{
+  "name": "uoi-identification-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "UOI Identification Discord Bot",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "node-fetch": "^3.3.2",
+    "dotenv": "^16.4.1"
+  }
+}
