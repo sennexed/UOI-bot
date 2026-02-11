@@ -1,18 +1,10 @@
 FROM python:3.10-slim
 
-# Install Node.js
-RUN apt-get update && apt-get install -y nodejs npm
-
 WORKDIR /app
-
 COPY . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r Requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Node dependencies
-RUN npm install
+EXPOSE 8080
 
-EXPOSE 5000
-
-CMD python app.py & node index.js
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app"]
