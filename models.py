@@ -1,21 +1,15 @@
+import uuid
+from datetime import datetime
 from database import db
 
-class User(db.Model):
+class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-
-    user_id = db.Column(db.String(5), unique=True, nullable=False)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-
-    discord_id = db.Column(db.String(30), unique=True, nullable=True)
-
-    role = db.Column(db.String(20), default="member")
-    status = db.Column(db.String(20), default="active")
-
-
-class AuditLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    actor = db.Column(db.String(50))
-    action = db.Column(db.String(100))
-    target = db.Column(db.String(50))
-    timestamp = db.Column(db.DateTime, default=db.func.now())
+    card_id = db.Column(db.String, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(6), unique=True)
+    discord_id = db.Column(db.String, unique=True)
+    full_name = db.Column(db.String)
+    nationality = db.Column(db.String)
+    password = db.Column(db.String)
+    status = db.Column(db.String, default="pending")
+    issued_at = db.Column(db.DateTime)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
