@@ -11,12 +11,12 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
+# Create tables safely (Flask 3 compatible)
+with app.app_context():
+    db.create_all()
+
 def generate_id():
     return str(random.randint(100000, 999999))
-
-@app.before_first_request
-def create_tables():
-    db.create_all()
 
 @app.route("/register", methods=["POST"])
 def register():
