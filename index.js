@@ -82,7 +82,7 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.commandName === "login") {
 
-    const res = await fetch("http://localhost:5000/login", {
+    const res = await fetch("http://localhost:8080/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -95,7 +95,7 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.reply({ content: "Login failed", ephemeral: true });
     }
 
-    await fetch("http://localhost:5000/link-discord", {
+    await fetch("http://localhost:8080/link-discord", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -126,7 +126,7 @@ client.on("interactionCreate", async (interaction) => {
 
     const user = interaction.options.getUser("user");
 
-    const res = await fetch("http://localhost:5000/myid", {
+    const res = await fetch("http://localhost:8080/myid", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ discord_id: user.id })
