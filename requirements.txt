@@ -1,5 +1,5 @@
-flask
-flask_sqlalchemy
+Flask==2.3.3
+flask_sqlalchemy==3.0.5
 psycopg2-binary
 python-dotenv
 pillow
