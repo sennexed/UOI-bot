@@ -1,23 +1,18 @@
-FROM node:18
+FROM python:3.10-slim
 
-# Install Python + venv support
-RUN apt-get update && apt-get install -y python3 python3-venv python3-pip
+# Install Node.js
+RUN apt-get update && apt-get install -y nodejs npm
 
 WORKDIR /app
 
 COPY . .
 
-# Install Node deps
+# Install Python dependencies
+RUN pip install --no-cache-dir -r Requirements.txt
+
+# Install Node dependencies
 RUN npm install
-
-# Create virtual environment
-RUN python3 -m venv venv
-
-# Activate venv and install Python deps
-RUN ./venv/bin/pip install --upgrade pip
-RUN ./venv/bin/pip install -r Requirements.txt
 
 EXPOSE 5000
 
-# Start backend using venv + start bot
-CMD ./venv/bin/python app.py & node index.js
+CMD python app.py & node index.js
