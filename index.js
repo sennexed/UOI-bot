@@ -77,7 +77,18 @@ async function registerCommands() {
 
 client.once("ready", async () => {
   console.log("🤖 Bot Online");
-  await registerCommands();
+
+  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+
+  // 🔥 Delete ALL global commands
+  await rest.put(
+    Routes.applicationCommands(process.env.APPLICATION_ID),
+    { body: [] }
+  );
+
+  console.log("🧹 Global commands cleared");
+
+  await registerCommands(); // Re-register only guild commands
 });
 
 //
