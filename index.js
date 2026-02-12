@@ -21,6 +21,7 @@ dotenv.config();
 
 const APPLICATION_ID = process.env.APPLICATION_ID;
 const GUILD_ID = process.env.GUILD_ID;
+const BACKEND_URL = process.env.BACKEND_URL;
 
 const INDIAN_ROLE = "1468475916656181338";
 const FOREIGN_ROLE = "1467589863690862834";
@@ -32,21 +33,14 @@ const client = new Client({
 });
 
 //
-// 🔹 Register Guild Commands ONLY (no global)
+// 🔥 REGISTER COMMANDS CLEANLY
 //
 async function registerCommands() {
+
   const commands = [
     new SlashCommandBuilder()
       .setName("register")
       .setDescription("Apply for UOI ID"),
-
-    new SlashCommandBuilder()
-      .setName("status")
-      .setDescription("Check your registration status"),
-
-    new SlashCommandBuilder()
-      .setName("card")
-      .setDescription("Get your UOI ID card"),
 
     new SlashCommandBuilder()
       .setName("requests")
@@ -60,39 +54,37 @@ async function registerCommands() {
 
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
-  // 🔥 Clear ONLY guild commands
+  // 🔥 Clear GLOBAL commands
+  await rest.put(
+    Routes.applicationCommands(APPLICATION_ID),
+    { body: [] }
+  );
+
+  // 🔥 Clear GUILD commands
   await rest.put(
     Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
     { body: [] }
   );
 
-  // 🔥 Register fresh commands
+  // 🔥 Register fresh GUILD commands
   await rest.put(
     Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
     { body: commands }
   );
 
-  console.log("✅ Commands registered cleanly.");
+  console.log("✅ Slash commands refreshed cleanly");
 }
 
-client.once("ready", async () => {
-  console.log("🤖 Bot Online");
-
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-
-  // 🔥 Delete ALL global commands
-  await rest.put(
-    Routes.applicationCommands(process.env.APPLICATION_ID),
-    { body: [] }
-  );
-
-  console.log("🧹 Global commands cleared");
-
-  await registerCommands(); // Re-register only guild commands
+//
+// 🚀 READY
+//
+client.once("clientReady", async () => {
+  console.log("🤖 UOI Bot Online");
+  await registerCommands();
 });
 
 //
-// 🔹 Interaction Handler
+// 🔹 INTERACTIONS
 //
 client.on("interactionCreate", async interaction => {
 
@@ -117,7 +109,7 @@ client.on("interactionCreate", async interaction => {
 
     const passwordInput = new TextInputBuilder()
       .setCustomId("password")
-      .setLabel("Password (6 characters)")
+      .setLabel("Password (exactly 6 characters)")
       .setStyle(TextInputStyle.Short)
       .setRequired(true);
 
@@ -130,43 +122,6 @@ client.on("interactionCreate", async interaction => {
     return interaction.showModal(modal);
   }
 
-  // ---------------- STATUS ----------------
-  if (interaction.isChatInputCommand() && interaction.commandName === "status") {
-
-    await interaction.deferReply({ ephemeral: true });
-
-    const response = await fetch(
-      `${process.env.BACKEND_URL}/status/${interaction.user.id}`
-    );
-
-    if (!response.ok) {
-      return interaction.editReply("Not registered.");
-    }
-
-    const data = await response.json();
-    return interaction.editReply(`Your status: **${data.status}**`);
-  }
-
-  // ---------------- CARD ----------------
-  if (interaction.isChatInputCommand() && interaction.commandName === "card") {
-
-    await interaction.deferReply();
-
-    const response = await fetch(
-      `${process.env.BACKEND_URL}/card/${interaction.user.id}?avatar=${interaction.user.displayAvatarURL({ extension: "png", size: 256 })}`
-    );
-
-    if (!response.ok) {
-      return interaction.editReply("Card not available.");
-    }
-
-    const buffer = await response.arrayBuffer();
-
-    return interaction.editReply({
-      files: [{ attachment: Buffer.from(buffer), name: "uoi-card.png" }]
-    });
-  }
-
   // ---------------- SET REQUEST CHANNEL ----------------
   if (interaction.isChatInputCommand() && interaction.commandName === "requests") {
 
@@ -176,7 +131,7 @@ client.on("interactionCreate", async interaction => {
 
     REQUEST_CHANNEL_ID = interaction.options.getChannel("channel").id;
 
-    return interaction.reply({ content: "Request channel set.", ephemeral: true });
+    return interaction.reply({ content: "✅ Request channel set.", ephemeral: true });
   }
 
   // ---------------- MODAL SUBMIT ----------------
@@ -187,10 +142,13 @@ client.on("interactionCreate", async interaction => {
     const password = interaction.fields.getTextInputValue("password");
 
     if (password.length !== 6) {
-      return interaction.reply({ content: "Password must be exactly 6 characters.", ephemeral: true });
+      return interaction.reply({
+        content: "Password must be exactly 6 characters.",
+        ephemeral: true
+      });
     }
 
-    await fetch(`${process.env.BACKEND_URL}/register`, {
+    await fetch(`${BACKEND_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -202,7 +160,7 @@ client.on("interactionCreate", async interaction => {
     });
 
     await interaction.reply({
-      content: "Request submitted.",
+      content: "Your request has been submitted. Please wait 1–2 business days.",
       ephemeral: true
     });
 
@@ -230,10 +188,10 @@ client.on("interactionCreate", async interaction => {
         .setStyle(ButtonStyle.Danger)
     );
 
-    requestChannel.send({ embeds: [embed], components: [row] });
+    await requestChannel.send({ embeds: [embed], components: [row] });
   }
 
-  // ---------------- BUTTONS ----------------
+  // ---------------- BUTTON HANDLER ----------------
   if (interaction.isButton()) {
 
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -244,21 +202,30 @@ client.on("interactionCreate", async interaction => {
 
     if (action === "approve") {
 
-      const response = await fetch(`${process.env.BACKEND_URL}/approve/${discordId}`, {
+      const response = await fetch(`${BACKEND_URL}/approve/${discordId}`, {
         method: "POST"
       });
 
       const data = await response.json();
       const member = await interaction.guild.members.fetch(discordId);
 
-      await member.roles.add(INDIAN_ROLE);
-      await member.send(`Your UOI ID has been approved.\nID: ${data.user_id}`);
+      const nationality = interaction.message.embeds[0].data.fields[2].value;
 
-      return interaction.update({ content: "Approved.", components: [] });
+      if (nationality.toLowerCase() === "indian") {
+        await member.roles.add(INDIAN_ROLE);
+      } else {
+        await member.roles.add(FOREIGN_ROLE);
+      }
+
+      await member.send(
+        `Welcome to UOI!\nYour ID has been approved.\nYour UOI ID: ${data.user_id}`
+      );
+
+      await interaction.update({ content: "✅ Approved.", components: [] });
     }
 
     if (action === "reject") {
-      return interaction.update({ content: "Rejected.", components: [] });
+      await interaction.update({ content: "❌ Rejected.", components: [] });
     }
   }
 });
