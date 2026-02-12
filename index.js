@@ -51,10 +51,19 @@ async function registerCommands() {
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
   await rest.put(
-    Routes.applicationCommands(APPLICATION_ID),
-    { body: commands }
-  );
-}
+  Routes.applicationCommands(APPLICATION_ID),
+  { body: [] }
+);
+
+await rest.put(
+  Routes.applicationGuildCommands(
+    APPLICATION_ID,
+    process.env.GUILD_ID
+  ),
+  { body: [] }
+);
+
+console.log("🧹 All commands cleared");
 
 client.once("ready", async () => {
   console.log("Bot Online");
